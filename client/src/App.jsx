@@ -1,122 +1,91 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useState, useEffect } from 'react';
+import axios from 'axios';
+import GameImage from './components/GameImage';
+import ScoreForm from './components/ScoreForm';
+import Leaderboard from './components/Leaderboard';
+import waldoImage from './assets/waldoimg.jpeg';
+import './App.css';
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [characters, setCharacters] = useState([]);
+  const [foundCharacters, setFoundCharacters] = useState([]);
+  const [gameComplete, setGameComplete] = useState(false);
+  const [elapsed, setElapsed] = useState(null);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [gameKey, setGameKey] = useState(0); // changing this forces GameImage to fully reset
+
+  const startGame = async () => {
+    const [charsRes] = await Promise.all([
+      axios.get('/api/characters'),
+      axios.post('/api/start', {}, { withCredentials: true })
+    ]);
+    setCharacters(charsRes.data.map(c => c.name));
+    setFoundCharacters([]);
+    setGameComplete(false);
+    setElapsed(null);
+    setShowLeaderboard(false);
+    setGameKey(prev => prev + 1); // forces GameImage to remount and clear markers
+  };
+
+  useEffect(() => {
+    startGame();
+  }, []);
+
+  const handleCorrectFind = async (characterName) => {
+    const newFound = [...foundCharacters, characterName];
+    setFoundCharacters(newFound);
+
+    if (newFound.length === characters.length) {
+      const res = await axios.get('/api/elapsed', { withCredentials: true });
+      setElapsed(res.data.elapsed);
+      setGameComplete(true);
+    }
+  };
+
+  const handleScoreSaved = () => {
+    setShowLeaderboard(true);
+  };
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
+    <div className="app">
+      <h1>Where's Waldo?</h1>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, justifyContent: 'center', marginBottom: 8 }}>
+        <p style={{ margin: 0 }}>
+          Find: {characters.filter(c => !foundCharacters.includes(c)).join(', ') || '🎉 All found!'}
+        </p>
+        <button onClick={startGame} style={{ padding: '6px 16px', cursor: 'pointer' }}>
+          🔄 Restart
         </button>
-      </section>
+      </div>
 
-      <div className="ticks"></div>
+      <GameImage
+        key={gameKey}
+        imageSrc={waldoImage}
+        characters={characters}
+        foundCharacters={foundCharacters}
+        onCorrectFind={handleCorrectFind}
+      />
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+      {gameComplete && !showLeaderboard && (
+        <ScoreForm elapsed={elapsed} onSaved={handleScoreSaved} />
+      )}
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+      {showLeaderboard && (
+        <>
+          <Leaderboard />
+          <div style={{ textAlign: 'center', marginTop: 16 }}>
+            <button
+              onClick={startGame}
+              style={{ padding: '10px 24px', fontSize: 16, cursor: 'pointer' }}
+            >
+              🎮 Play Again
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
-export default App
+export default App;
